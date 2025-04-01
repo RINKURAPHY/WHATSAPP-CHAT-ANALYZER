@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Chat Analysis</title>
+    <title>Daily Message Trends</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; }
+        .container { width: 60%; margin: auto; }
+        .hidden { display: none; }
+        canvas { max-width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>WhatsApp Chat Analysis</h1>
+
+    <div class="container">
+        <input type="file" id="chatFile">
+        <button onclick="uploadChat()">Analyze</button>
+        <form action="/message_trends" method="POST" enctype="multipart/form-data">
+        <input type="file" name="chat_file" accept=".csv, .txt" required>
+        <button type="submit">Upload</button>
+        </form>
+
+
+        <h2>Top Users</h2>
+        <ul id="topUsers"></ul>
+
+        <h2>Word Cloud</h2>
+        <img id="wordCloudImg" class="hidden" src="">
+
+        <h2>Sentiment Analysis</h2>
+        <p id="sentimentResult"></p>
+
+        <h2>Daily Message Trends</h2>
+        <img src="{{ trends_image }}" alt="Daily Message Trends">
+    </div>
+
+    <script>
+        function uploadChat() {
+            let file = $("#chatFile")[0].files[0];
+            if (!file) {
+                alert("Please select a file.");
+                return;
+            }
+
+            let formData = new FormData();
+            formData.append("chat_file", file);  // ✅ FIXED: Changed "file" to "chat_file"
+
+            $.post({
+                url: "http://127.0.0.1:5000/top_users",  // ✅ Ensure correct Flask URL
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (data) {
+                    console.log("Top Users Data:", data);
+                },
+                error: function (xhr) {
+                    console.error("Error:", xhr.responseText);
+                }
+            });
+
+            // Top Users
+            $.post({
+                url: "/top_users",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (data) {
+                    $("#topUsers").empty();
+                    for (let user in data) {
+                        $("#topUsers").append(`<li>${user}: ${data[user]} messages</li>`);
+                    }
+                },
+                error: function (xhr) {
+                    console.error("Error:", xhr.responseText);
+                    alert("Error fetching top users.");
+                }
+            });
+
+            // Word Cloud
+            $.post({
+                url: "/wordcloud",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function () {
+                    $("#wordCloudImg").attr("src", "/static/wordcloud.png").removeClass("hidden");
+                },
+                error: function (xhr) {
+                    console.error("Error:", xhr.responseText);
+                    alert("Error generating word cloud.");
+                }
+            });
+
+            // Sentiment Analysis
+            $.post({
+                url: "/sentiment_analysis",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (data) {
+                    $("#sentimentResult").text(`Overall Sentiment: ${data.sentiment}`);
+                },
+                error: function (xhr) {
+                    console.error("Error:", xhr.responseText);
+                    alert("Error in sentiment analysis.");
+                }
+            });
+
+            // Message Trends
+            $.post({
+                url: "/message_trends",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function (data) {
+                    let ctx = document.getElementById("messageTrendsChart").getContext("2d");
+                    new Chart(ctx, {
+                        type: "line",
+                        data: {
+                            labels: data.dates,
+                            datasets: [{
+                                label: "Messages per Day",
+                                data: data.counts,
+                                borderColor: "blue",
+                                fill: false
+                            }]
+                        }
+                    });
+                },
+                error: function (xhr) {
+                    console.error("Error:", xhr.responseText);
+                    alert("Error fetching message trends.");
+                }
+            });
+        }
+
+    </script>
+</body>
+</html>
